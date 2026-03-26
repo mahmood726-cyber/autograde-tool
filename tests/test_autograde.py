@@ -161,7 +161,7 @@ class TestAutoGRADE(unittest.TestCase):
         imp = [d for d in r['domains'] if d['name'] == 'Imprecision'][0]
         self.assertEqual(imp['down'], 2, 'CI crosses null + OIS not met → very serious (-2)')
 
-    # 11: Egger p < 0.05 → very serious pub bias
+    # 11: Egger p < 0.10 → serious pub bias; p < 0.01 → very serious
     def test_11_pub_bias(self):
         self.js("""
             document.getElementById('exSel').value = 'sglt2i';
@@ -172,7 +172,7 @@ class TestAutoGRADE(unittest.TestCase):
         time.sleep(0.3)
         r = self.js("return window._lastGrade;")
         pub = [d for d in r['domains'] if d['name'] == 'Publication Bias'][0]
-        self.assertEqual(pub['down'], 2, f'Egger p=0.03 should be -2, got {pub["down"]}')
+        self.assertEqual(pub['down'], 1, f'Egger p=0.03 should be -1 (serious), got {pub["down"]}')
 
     # 12: Observational + large effect → upgrade
     def test_12_obs_upgrade(self):

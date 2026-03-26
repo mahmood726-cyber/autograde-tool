@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- CSP: unsafe-inline for single-file; unsafe-eval for Plotly -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plot.ly; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self';" />
+  <!-- CSP: unsafe-inline for single-file app -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self';" />
   <title>AutoGRADE — Open-Source Certainty of Evidence Calculator</title>
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     :root {
       --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --accent:#0891b2;
@@ -147,6 +146,10 @@
     <div class="row">
       <div><label for="oisMet">Optimal Information Size met?</label>
         <select id="oisMet"><option value="yes">Yes (N exceeds OIS)</option><option value="no" selected>No / Uncertain</option></select></div>
+      <div><label for="mid" title="Optional: clinical decision threshold for imprecision check">MID (optional, ratio scale)</label>
+        <input type="number" id="mid" step="0.01" min="0" value="" placeholder="e.g. 0.75" /></div>
+    </div>
+    <div class="row">
       <div><label for="doseResponse">Dose-response gradient?</label>
         <select id="doseResponse"><option value="no" selected>No</option><option value="yes">Yes</option></select></div>
     </div>
@@ -175,7 +178,7 @@
 
     <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
       <button type="button" class="btn btn-sm" onclick="exportJSON()">Export JSON</button>
-      <button type="button" class="btn btn-sm" onclick="copySoF()">Copy SoF Table</button>
+      <button type="button" class="btn btn-sm" id="copySofBtn">Copy SoF Table</button>
     </div>
   </div>
 
@@ -207,7 +210,7 @@
 
     <h3>Thresholds Used</h3>
     <ul>
-      <li>RoB: >30% high → serious; >50% high → very serious</li>
+      <li>RoB: >30% high → serious; >50% high → very serious <em>(AutoGRADE heuristic — GRADE recommends weight-proportional assessment)</em></li>
       <li>I²: 0-40% not serious; 40-75% serious; >75% very serious</li>
       <li>Imprecision: CI crosses null → serious; CI crosses null AND OIS not met → very serious</li>
       <li>Pub bias: Egger p < 0.10 AND k < 10 → serious; Egger p < 0.05 → very serious</li>
@@ -292,9 +295,11 @@ function computeGrade() {
   const plausibleConf = document.getElementById('plausibleConf').value === 'yes';
 
   if (!isFinite(est) || !isFinite(lo) || !isFinite(hi)) {
-    document.getElementById('gradeResult').textContent = 'Invalid input';
+    document.getElementById('gradeResult').textContent = 'Invalid input — check effect estimate and CI';
     return;
   }
+  // Swap inverted CI
+  if (lo > hi) { const tmp = lo; lo = hi; hi = tmp; }
 
   // ── Starting certainty ──
   let score = design === 'RCT' ? 4 : 2; // RCT starts HIGH (4), OBS starts LOW (2)
@@ -338,13 +343,15 @@ function computeGrade() {
   // ── 4. Imprecision ──
   let impDown = 0;
   const isRatio = ['OR','RR','HR'].includes(measure);
-  const nullVal = isRatio ? 1.0 : 0;
   const ciCrossesNull = isRatio ? (lo < 1 && hi > 1) : (lo < 0 && hi > 0);
 
-  // OIS: simplified — for binary: OIS = (z_alpha + z_beta)^2 * 2 * p * (1-p) / delta^2
-  // Quick check: is totalN sufficient?
-  if (ciCrossesNull && !oisMet) impDown = 2;
-  else if (ciCrossesNull || !oisMet) impDown = 1;
+  // Also check clinical decision threshold (MID) if provided
+  const mid = pNum('mid', NaN);
+  const ciCrossesMID = isFinite(mid) && isRatio ? (lo < mid && hi > mid) || (lo < 1/mid && hi > 1/mid) : false;
+  const imprecise = ciCrossesNull || ciCrossesMID;
+
+  if (imprecise && !oisMet) impDown = 2;
+  else if (imprecise || !oisMet) impDown = 1;
   score -= impDown;
   domains.push({
     name: 'Imprecision', down: impDown,
@@ -355,14 +362,16 @@ function computeGrade() {
 
   // ── 5. Publication Bias ──
   let pubDown = 0;
-  if (eggerP < 0.05) pubDown = 2;
-  else if (eggerP < 0.10 && k < 10) pubDown = 1;
+  // GRADE: Egger's test is one signal, not sole basis. p<0.10 = serious; very serious requires p<0.01 or multiple indicators
+  if (eggerP < 0.01) pubDown = 2;
+  else if (eggerP < 0.10) pubDown = 1;
+  const pubWarn = k < 10 ? ' (Egger test unreliable at k<10)' : '';
   score -= pubDown;
   domains.push({
     name: 'Publication Bias', down: pubDown,
-    detail: pubDown === 0 ? 'Not detected (Egger p = ' + eggerP.toFixed(2) + ')'
-          : pubDown === 1 ? 'Serious (Egger p = ' + eggerP.toFixed(2) + ', k < 10)'
-          : 'Very serious (Egger p = ' + eggerP.toFixed(2) + ')'
+    detail: pubDown === 0 ? 'Not detected (Egger p = ' + eggerP.toFixed(2) + ')' + pubWarn
+          : pubDown === 1 ? 'Serious (Egger p = ' + eggerP.toFixed(2) + ')' + pubWarn
+          : 'Very serious (Egger p = ' + eggerP.toFixed(2) + ')' + pubWarn
   });
 
   // ── Upgrade domains (observational only) ──
@@ -423,15 +432,18 @@ function computeGrade() {
   // SoF table
   const eventsPer1000 = cer !== null ? Math.round(cer * 1000) : '—';
   const expPer1000 = eer !== null ? Math.round(eer * 1000) : '—';
-  const diffPer1000 = arr !== null ? Math.round((cer - (eer ?? cer)) * 1000) : '—';
+  const rawDiff = cer - (eer ?? cer);
+  const diffPer1000 = arr !== null ? Math.abs(Math.round(rawDiff * 1000)) : '—';
+  const diffDirection = rawDiff > 0 ? 'fewer' : rawDiff < 0 ? 'more' : 'same';
+  const nntLabel = rawDiff > 0 ? 'NNT' : rawDiff < 0 ? 'NNH' : 'NNT';
 
   document.getElementById('sofBody').innerHTML =
     '<tr><th>Outcomes</th><th>Control</th><th>Intervention</th><th>Difference</th><th>NNT</th><th>Certainty</th></tr>' +
     '<tr><td>Primary outcome</td>' +
     '<td class="num">' + eventsPer1000 + ' per 1,000</td>' +
     '<td class="num">' + expPer1000 + ' per 1,000</td>' +
-    '<td class="num">' + diffPer1000 + ' fewer per 1,000</td>' +
-    '<td class="num">' + (isFinite(nnt) ? nnt : '—') + '</td>' +
+    '<td class="num">' + diffPer1000 + ' ' + escapeHtml(diffDirection) + ' per 1,000</td>' +
+    '<td class="num">' + (isFinite(nnt) ? escapeHtml(nntLabel) + ' ' + nnt : '—') + '</td>' +
     '<td><span class="grade-badge grade-' + gradeLabel.replace(' ', '_') + '">' + escapeHtml(gradeLabel) + '</span></td></tr>';
 
   window._lastGrade = {
@@ -474,11 +486,10 @@ function copySoF() {
   range.selectNode(table);
   window.getSelection().removeAllRanges();
   window.getSelection().addRange(range);
-  document.execCommand('copy');
+  try { navigator.clipboard.writeText(table.innerText); } catch (_) { document.execCommand('copy'); }
   window.getSelection().removeAllRanges();
-  const btn = event.target;
-  btn.textContent = 'Copied!';
-  setTimeout(() => { btn.textContent = 'Copy SoF Table'; }, 1500);
+  const btn = document.getElementById('copySofBtn');
+  if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy SoF Table'; }, 1500); }
 }
 
 /* ═══════════════════════════════════════════════════════════════
