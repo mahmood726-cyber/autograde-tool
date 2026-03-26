@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CSP: unsafe-inline for single-file; unsafe-eval for Plotly -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plot.ly; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self';" />
+  <title>AutoGRADE — Open-Source Certainty of Evidence Calculator</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --accent:#0891b2;
+      --border:#e2e8f0; --shadow:0 1px 4px rgba(0,0,0,.06);
+      --high:#059669; --mod:#d97706; --low:#ea580c; --vlow:#dc2626;
+      --high-bg:#dcfce7; --mod-bg:#fef9c3; --low-bg:#ffedd5; --vlow-bg:#fef2f2;
+    }
+    [data-theme="dark"] {
+      --bg:#0c0a1a; --card:#1a1633; --text:#e2e8f0; --muted:#94a3b8; --accent:#22d3ee;
+      --border:#2d2b4a; --shadow:0 1px 4px rgba(0,0,0,.3);
+      --high:#34d399; --mod:#fbbf24; --low:#fb923c; --vlow:#f87171;
+      --high-bg:#052e16; --mod-bg:#422006; --low-bg:#431407; --vlow-bg:#450a0a;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+    .hdr{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+    .hdr h1{font-size:1.2rem;font-weight:800;color:var(--accent)} .hdr-sub{font-size:.78rem;color:var(--muted);font-weight:400}
+    .hdr-btns{display:flex;gap:8px} .hdr-btns button{background:none;border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.82rem}
+    .hdr-btns button:hover{background:var(--accent);color:#fff;border-color:var(--accent)} .hdr-btns button:focus{outline:2px solid var(--accent);outline-offset:2px}
+
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px}
+    .card-t{font-size:.95rem;font-weight:700;margin-bottom:10px;color:var(--accent)}
+
+    label{display:block;font-size:.8rem;font-weight:600;margin-bottom:2px;color:var(--muted)}
+    input,select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-size:.88rem}
+    input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+    .row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap} .row>div{flex:1;min-width:120px} .grp{margin-bottom:10px}
+
+    .btn{background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:.92rem;font-weight:600;cursor:pointer;width:100%}
+    .btn:hover{opacity:.9} .btn:focus{outline:2px solid var(--accent);outline-offset:2px}
+    .btn-sm{padding:5px 12px;font-size:.8rem;width:auto}
+
+    /* GRADE badges */
+    .grade-badge{display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:.85rem;letter-spacing:.3px}
+    .grade-HIGH{background:var(--high-bg);color:var(--high)} .grade-MODERATE{background:var(--mod-bg);color:var(--mod)}
+    .grade-LOW{background:var(--low-bg);color:var(--low)} .grade-VERY_LOW{background:var(--vlow-bg);color:var(--vlow)}
+
+    /* Domain cards */
+    .domain{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px}
+    .domain-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .domain-name{font-weight:600;font-size:.88rem} .domain-score{font-size:.82rem;font-weight:600}
+    .domain-score.none{color:var(--high)} .domain-score.serious{color:var(--low)} .domain-score.very-serious{color:var(--vlow)}
+    .domain-detail{font-size:.8rem;color:var(--muted)}
+
+    /* SoF table */
+    .sof{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:12px}
+    .sof th,.sof td{padding:6px 10px;border:1px solid var(--border);text-align:left;vertical-align:top}
+    .sof th{background:var(--bg);font-weight:600;font-size:.78rem;text-transform:uppercase;color:var(--muted);letter-spacing:.3px}
+    .sof .num{text-align:right;font-family:'SF Mono',Consolas,monospace}
+
+    /* Gauge */
+    .gauge{text-align:center;padding:20px;border-radius:12px;margin-bottom:14px}
+    .gauge-val{font-size:1.6rem;font-weight:800} .gauge-sub{font-size:.82rem;color:var(--muted);margin-top:2px}
+
+    /* Symbols */
+    .sym-up{color:var(--high)} .sym-down{color:var(--vlow)} .sym-same{color:var(--muted)}
+
+    /* Modal */
+    .modal-ov{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center}
+    .modal-ov.hidden{display:none}
+    .modal{background:var(--card);border-radius:12px;max-width:700px;width:92%;max-height:85vh;overflow-y:auto;padding:24px;position:relative}
+    .modal h2{margin-bottom:10px} .modal h3{margin-top:12px;margin-bottom:4px;font-size:.9rem}
+    .modal-x{position:absolute;top:10px;right:14px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text)}
+    .modal-x:focus{outline:2px solid var(--accent)}
+    .modal ul,.modal ol{font-size:.85rem;padding-left:20px;margin:6px 0}
+  </style>
+</head>
+<body>
+<a href="#main" class="sr-only" style="position:absolute;left:-9999px" onfocus="this.style.cssText='position:fixed;top:0;left:0;z-index:9999;padding:8px 16px;background:var(--accent);color:#fff;font-size:1rem;text-decoration:none;border-radius:4px'" onblur="this.style.cssText='position:absolute;left:-9999px'">Skip to content</a>
+
+<header class="hdr">
+  <div><h1>AutoGRADE <span class="hdr-sub">Open-Source Certainty of Evidence Calculator</span></h1></div>
+  <div class="hdr-btns">
+    <button id="aboutBtn">About</button>
+    <button id="themeBtn">Dark Mode</button>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+
+  <!-- Example selector -->
+  <div class="card">
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:2">
+        <label for="exSel">Load Example</label>
+        <select id="exSel">
+          <option value="">— Custom —</option>
+          <option value="sglt2i" selected>SGLT2i in HFrEF (HF hospitalization)</option>
+          <option value="ssri">SSRIs for Depression (response rate)</option>
+          <option value="vitd">Vitamin D & Fractures (hip fracture)</option>
+        </select>
+      </div>
+      <div><button type="button" class="btn" onclick="computeGrade()">Assess Certainty</button></div>
+    </div>
+  </div>
+
+  <!-- Meta-analysis parameters -->
+  <div class="card">
+    <h2 class="card-t">Meta-Analysis Parameters</h2>
+    <div class="row">
+      <div><label for="studyDesign">Study Design</label>
+        <select id="studyDesign"><option value="RCT">Randomized Controlled Trials</option><option value="OBS">Observational Studies</option></select></div>
+      <div><label for="effectMeasure">Effect Measure</label>
+        <select id="effectMeasure"><option value="OR">Odds Ratio</option><option value="RR">Risk Ratio</option><option value="HR">Hazard Ratio</option><option value="MD">Mean Difference</option><option value="SMD">Standardized Mean Difference</option></select></div>
+    </div>
+    <div class="row">
+      <div><label for="effectEst">Point Estimate</label><input type="number" id="effectEst" step="0.01" value="0.64" /></div>
+      <div><label for="ciLo">95% CI Lower</label><input type="number" id="ciLo" step="0.01" value="0.53" /></div>
+      <div><label for="ciHi">95% CI Upper</label><input type="number" id="ciHi" step="0.01" value="0.78" /></div>
+    </div>
+    <div class="row">
+      <div><label for="kStudies">Studies (k)</label><input type="number" id="kStudies" min="1" step="1" value="6" /></div>
+      <div><label for="totalN">Total Participants</label><input type="number" id="totalN" min="1" step="1" value="12251" /></div>
+      <div><label for="i2">I² (%)</label><input type="number" id="i2" min="0" max="100" step="1" value="0" /></div>
+      <div><label for="tau2">tau²</label><input type="number" id="tau2" min="0" step="0.001" value="0" /></div>
+    </div>
+    <div class="row">
+      <div><label for="baselineRisk">Control Event Rate (%)</label><input type="number" id="baselineRisk" min="0" max="100" step="0.1" value="20" /></div>
+      <div><label for="eggerP">Egger's test p-value</label><input type="number" id="eggerP" min="0" max="1" step="0.01" value="0.45" /></div>
+    </div>
+  </div>
+
+  <!-- Domain-specific inputs -->
+  <div class="card">
+    <h2 class="card-t">Domain-Specific Inputs</h2>
+    <div class="row">
+      <div><label for="robHigh">Studies with High RoB (%)</label><input type="number" id="robHigh" min="0" max="100" step="1" value="10" /></div>
+      <div><label for="robUnclear">Studies with Unclear RoB (%)</label><input type="number" id="robUnclear" min="0" max="100" step="1" value="20" /></div>
+    </div>
+    <div class="row">
+      <div><label for="indirectness">Indirectness</label>
+        <select id="indirectness"><option value="0">No concerns</option><option value="1">Serious (population, intervention, or outcome differs)</option><option value="2">Very serious (multiple domains differ)</option></select></div>
+    </div>
+    <div class="row">
+      <div><label for="oisMet">Optimal Information Size met?</label>
+        <select id="oisMet"><option value="yes">Yes (N exceeds OIS)</option><option value="no" selected>No / Uncertain</option></select></div>
+      <div><label for="doseResponse">Dose-response gradient?</label>
+        <select id="doseResponse"><option value="no" selected>No</option><option value="yes">Yes</option></select></div>
+    </div>
+    <div class="row">
+      <div><label for="largeEffect">Large effect? (OR &lt; 0.5 or &gt; 2.0)</label>
+        <select id="largeEffect"><option value="no" selected>No</option><option value="yes">Yes (moderate: OR 0.5-0.2 / 2-5)</option><option value="very">Yes (very large: OR &lt; 0.2 / &gt; 5)</option></select></div>
+      <div><label for="plausibleConf">Plausible confounding?</label>
+        <select id="plausibleConf"><option value="no" selected>No</option><option value="yes">Would reduce effect (upgrades certainty)</option></select></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="card" id="resultsCard" aria-live="polite" aria-atomic="true">
+    <h2 class="card-t">GRADE Assessment</h2>
+    <div class="gauge" id="gradeGauge">
+      <div class="gauge-val" id="gradeResult">—</div>
+      <div class="gauge-sub" id="gradeSummary"></div>
+    </div>
+
+    <!-- Domain breakdown -->
+    <div id="domainBreakdown"></div>
+
+    <!-- Summary of Findings table -->
+    <h3 class="card-t" style="margin-top:14px">Summary of Findings</h3>
+    <div style="overflow-x:auto"><table class="sof" id="sofTable"><tbody id="sofBody"></tbody></table></div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button type="button" class="btn btn-sm" onclick="exportJSON()">Export JSON</button>
+      <button type="button" class="btn btn-sm" onclick="copySoF()">Copy SoF Table</button>
+    </div>
+  </div>
+
+</main>
+
+<!-- About Modal -->
+<div class="modal-ov hidden" id="aboutModal" role="dialog" aria-modal="true" aria-labelledby="aboutT">
+  <div class="modal">
+    <button class="modal-x" id="aboutX" aria-label="Close">&times;</button>
+    <h2 id="aboutT">AutoGRADE v1.0.0</h2>
+    <p><strong>Open-Source Certainty of Evidence Calculator</strong></p>
+    <p>Computes GRADE certainty ratings from quantitative meta-analysis parameters. The first open-source, browser-based tool that automates all 5 downgrade domains and 3 upgrade domains.</p>
+
+    <h3>GRADE Domains</h3>
+    <h4 style="font-size:.85rem;margin-top:8px">Downgrade (each -1 or -2):</h4>
+    <ol>
+      <li><strong>Risk of Bias</strong>: proportion of studies at high/unclear RoB, weighted by contribution</li>
+      <li><strong>Inconsistency</strong>: I² thresholds (>40% serious, >75% very serious) + direction</li>
+      <li><strong>Indirectness</strong>: user-assessed (population, intervention, comparator, outcome)</li>
+      <li><strong>Imprecision</strong>: OIS not met + CI crosses null or clinical threshold</li>
+      <li><strong>Publication Bias</strong>: Egger's p < 0.10 + small study count</li>
+    </ol>
+    <h4 style="font-size:.85rem;margin-top:8px">Upgrade (observational only, each +1):</h4>
+    <ol>
+      <li><strong>Large effect</strong>: OR < 0.5 or > 2.0</li>
+      <li><strong>Dose-response</strong>: gradient present</li>
+      <li><strong>Plausible confounding</strong>: would reduce the observed effect</li>
+    </ol>
+
+    <h3>Thresholds Used</h3>
+    <ul>
+      <li>RoB: >30% high → serious; >50% high → very serious</li>
+      <li>I²: 0-40% not serious; 40-75% serious; >75% very serious</li>
+      <li>Imprecision: CI crosses null → serious; CI crosses null AND OIS not met → very serious</li>
+      <li>Pub bias: Egger p < 0.10 AND k < 10 → serious; Egger p < 0.05 → very serious</li>
+    </ul>
+
+    <h3>Output</h3>
+    <p>Overall: HIGH / MODERATE / LOW / VERY LOW. Plus a Summary of Findings table with absolute effects and NNT.</p>
+
+    <h3>Limitations</h3>
+    <ul>
+      <li>GRADE inherently involves judgment — this tool automates the quantitative components but cannot replace domain expertise for indirectness and some RoB assessments</li>
+      <li>Thresholds are based on published GRADE guidance but may differ from panel-specific decisions</li>
+      <li>OIS computation uses simplified formula (not trial sequential analysis)</li>
+    </ul>
+    <h3>References</h3>
+    <ul>
+      <li>Guyatt GH et al. GRADE: an emerging consensus on rating quality of evidence. BMJ. 2008;336:924-926.</li>
+      <li>Balshem H et al. GRADE guidelines: rating the quality of evidence. JCE. 2011;64:401-406.</li>
+      <li>Schunemann HJ et al. GRADE handbook. Available at: gdt.gradepro.org/app/handbook</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function pNum(id, fb) { const v = parseFloat(document.getElementById(id).value); return isFinite(v) ? v : fb; }
+function pInt(id, fb) { const v = parseInt(document.getElementById(id).value); return isFinite(v) ? v : fb; }
+
+/* ═══════════════════════════════════════════════════════════════
+   EXAMPLES
+═══════════════════════════════════════════════════════════════ */
+const EXAMPLES = {
+  sglt2i: {
+    studyDesign:'RCT', effectMeasure:'HR', effectEst:0.64, ciLo:0.53, ciHi:0.78,
+    kStudies:6, totalN:12251, i2:0, tau2:0, baselineRisk:20, eggerP:0.45,
+    robHigh:10, robUnclear:20, indirectness:'0', oisMet:'yes',
+    doseResponse:'no', largeEffect:'no', plausibleConf:'no',
+    label:'SGLT2i for HF hospitalization in HFrEF (DAPA-HF, EMPEROR-Reduced pooled analysis)'
+  },
+  ssri: {
+    studyDesign:'RCT', effectMeasure:'OR', effectEst:1.66, ciLo:1.52, ciHi:1.82,
+    kStudies:72, totalN:18526, i2:52, tau2:0.08, baselineRisk:40, eggerP:0.02,
+    robHigh:35, robUnclear:30, indirectness:'1', oisMet:'yes',
+    doseResponse:'no', largeEffect:'no', plausibleConf:'no',
+    label:'SSRIs for response in major depression (Cipriani 2018)'
+  },
+  vitd: {
+    studyDesign:'RCT', effectMeasure:'RR', effectEst:0.84, ciLo:0.70, ciHi:1.01,
+    kStudies:9, totalN:49282, i2:22, tau2:0.01, baselineRisk:3, eggerP:0.30,
+    robHigh:15, robUnclear:25, indirectness:'0', oisMet:'no',
+    doseResponse:'no', largeEffect:'no', plausibleConf:'no',
+    label:'Vitamin D for hip fracture prevention (Bolland 2014)'
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GRADE ENGINE
+═══════════════════════════════════════════════════════════════ */
+
+function computeGrade() {
+  const design = document.getElementById('studyDesign').value;
+  const measure = document.getElementById('effectMeasure').value;
+  const est = pNum('effectEst', NaN);
+  const lo = pNum('ciLo', NaN);
+  const hi = pNum('ciHi', NaN);
+  const k = pInt('kStudies', 2);
+  const totalN = pInt('totalN', 1000);
+  const i2 = pNum('i2', 0);
+  const tau2 = pNum('tau2', 0);
+  const cer = pNum('baselineRisk', 10) / 100;
+  const eggerP = pNum('eggerP', 1);
+  const robHigh = pNum('robHigh', 0);
+  const robUnclear = pNum('robUnclear', 0);
+  const indirectness = parseInt(document.getElementById('indirectness').value);
+  const oisMet = document.getElementById('oisMet').value === 'yes';
+  const doseResponse = document.getElementById('doseResponse').value === 'yes';
+  const largeEffect = document.getElementById('largeEffect').value;
+  const plausibleConf = document.getElementById('plausibleConf').value === 'yes';
+
+  if (!isFinite(est) || !isFinite(lo) || !isFinite(hi)) {
+    document.getElementById('gradeResult').textContent = 'Invalid input';
+    return;
+  }
+
+  // ── Starting certainty ──
+  let score = design === 'RCT' ? 4 : 2; // RCT starts HIGH (4), OBS starts LOW (2)
+  const domains = [];
+
+  // ── 1. Risk of Bias ──
+  let robDown = 0;
+  if (robHigh > 50) robDown = 2;
+  else if (robHigh > 30 || (robHigh + robUnclear) > 60) robDown = 1;
+  score -= robDown;
+  domains.push({
+    name: 'Risk of Bias', down: robDown,
+    detail: robDown === 0 ? 'No serious concerns (' + robHigh + '% high RoB)'
+          : robDown === 1 ? 'Serious (' + robHigh + '% high, ' + robUnclear + '% unclear)'
+          : 'Very serious (' + robHigh + '% high RoB)'
+  });
+
+  // ── 2. Inconsistency ──
+  let inconDown = 0;
+  if (i2 > 75) inconDown = 2;
+  else if (i2 > 40) inconDown = 1;
+  if (k <= 1) inconDown = 0; // Can't assess with single study
+  score -= inconDown;
+  domains.push({
+    name: 'Inconsistency', down: inconDown,
+    detail: k <= 1 ? 'Not applicable (single study)'
+          : inconDown === 0 ? 'No serious concerns (I\u00B2 = ' + i2 + '%)'
+          : inconDown === 1 ? 'Serious (I\u00B2 = ' + i2 + '%)'
+          : 'Very serious (I\u00B2 = ' + i2 + '%)'
+  });
+
+  // ── 3. Indirectness ──
+  score -= indirectness;
+  domains.push({
+    name: 'Indirectness', down: indirectness,
+    detail: indirectness === 0 ? 'No serious concerns'
+          : indirectness === 1 ? 'Serious (population, intervention, or outcome differs)'
+          : 'Very serious (multiple domains differ)'
+  });
+
+  // ── 4. Imprecision ──
+  let impDown = 0;
+  const isRatio = ['OR','RR','HR'].includes(measure);
+  const nullVal = isRatio ? 1.0 : 0;
+  const ciCrossesNull = isRatio ? (lo < 1 && hi > 1) : (lo < 0 && hi > 0);
+
+  // OIS: simplified — for binary: OIS = (z_alpha + z_beta)^2 * 2 * p * (1-p) / delta^2
+  // Quick check: is totalN sufficient?
+  if (ciCrossesNull && !oisMet) impDown = 2;
+  else if (ciCrossesNull || !oisMet) impDown = 1;
+  score -= impDown;
+  domains.push({
+    name: 'Imprecision', down: impDown,
+    detail: impDown === 0 ? 'No serious concerns (CI excludes null, OIS met)'
+          : impDown === 1 ? 'Serious (' + (ciCrossesNull ? 'CI crosses null' : 'OIS not met') + ')'
+          : 'Very serious (CI crosses null AND OIS not met)'
+  });
+
+  // ── 5. Publication Bias ──
+  let pubDown = 0;
+  if (eggerP < 0.05) pubDown = 2;
+  else if (eggerP < 0.10 && k < 10) pubDown = 1;
+  score -= pubDown;
+  domains.push({
+    name: 'Publication Bias', down: pubDown,
+    detail: pubDown === 0 ? 'Not detected (Egger p = ' + eggerP.toFixed(2) + ')'
+          : pubDown === 1 ? 'Serious (Egger p = ' + eggerP.toFixed(2) + ', k < 10)'
+          : 'Very serious (Egger p = ' + eggerP.toFixed(2) + ')'
+  });
+
+  // ── Upgrade domains (observational only) ──
+  let upgrades = [];
+  if (design === 'OBS') {
+    if (largeEffect === 'very') { score += 2; upgrades.push('Very large effect (+2)'); }
+    else if (largeEffect === 'yes') { score += 1; upgrades.push('Large effect (+1)'); }
+    if (doseResponse) { score += 1; upgrades.push('Dose-response gradient (+1)'); }
+    if (plausibleConf) { score += 1; upgrades.push('Plausible confounding (+1)'); }
+  }
+
+  // Clamp
+  score = Math.max(1, Math.min(4, score));
+  const gradeLabel = score >= 4 ? 'HIGH' : score === 3 ? 'MODERATE' : score === 2 ? 'LOW' : 'VERY LOW';
+  const gradeSymbols = score >= 4 ? '\u2a00\u2a00\u2a00\u2a00' : score === 3 ? '\u2a00\u2a00\u2a00\u25cb' : score === 2 ? '\u2a00\u2a00\u25cb\u25cb' : '\u2a00\u25cb\u25cb\u25cb';
+
+  // ── Absolute effects ──
+  let eer, arr, nnt;
+  if (isRatio && measure === 'OR') {
+    eer = cer * est / (1 - cer + cer * est);
+    arr = Math.abs(cer - eer);
+    nnt = arr > 0 ? Math.round(1 / arr) : Infinity;
+  } else if (isRatio) {
+    eer = cer * est;
+    arr = Math.abs(cer - eer);
+    nnt = arr > 0 ? Math.round(1 / arr) : Infinity;
+  } else {
+    eer = null; arr = null; nnt = null;
+  }
+
+  // ── Render ──
+  const gauge = document.getElementById('gradeGauge');
+  gauge.className = 'gauge grade-' + gradeLabel.replace(' ', '_');
+  document.getElementById('gradeResult').innerHTML =
+    '<span class="grade-badge grade-' + gradeLabel.replace(' ', '_') + '">' + escapeHtml(gradeLabel) + '</span>';
+  document.getElementById('gradeSummary').textContent =
+    'Starting: ' + (design === 'RCT' ? 'HIGH' : 'LOW') +
+    ' | Downgrades: ' + domains.reduce((s, d) => s + d.down, 0) +
+    (upgrades.length ? ' | Upgrades: ' + upgrades.length : '');
+
+  // Domain breakdown
+  let domHtml = '';
+  for (const d of domains) {
+    const scoreClass = d.down === 0 ? 'none' : d.down === 1 ? 'serious' : 'very-serious';
+    const scoreLabel = d.down === 0 ? 'No concern' : d.down === 1 ? 'Serious (-1)' : 'Very serious (-2)';
+    domHtml += '<div class="domain"><div class="domain-hdr">' +
+      '<span class="domain-name">' + escapeHtml(d.name) + '</span>' +
+      '<span class="domain-score ' + scoreClass + '">' + escapeHtml(scoreLabel) + '</span>' +
+      '</div><div class="domain-detail">' + escapeHtml(d.detail) + '</div></div>';
+  }
+  if (upgrades.length) {
+    domHtml += '<div class="domain" style="border-color:var(--high)"><div class="domain-hdr">' +
+      '<span class="domain-name">Upgrades</span>' +
+      '<span class="domain-score none">' + escapeHtml(upgrades.join('; ')) + '</span></div></div>';
+  }
+  document.getElementById('domainBreakdown').innerHTML = domHtml;
+
+  // SoF table
+  const eventsPer1000 = cer !== null ? Math.round(cer * 1000) : '—';
+  const expPer1000 = eer !== null ? Math.round(eer * 1000) : '—';
+  const diffPer1000 = arr !== null ? Math.round((cer - (eer ?? cer)) * 1000) : '—';
+
+  document.getElementById('sofBody').innerHTML =
+    '<tr><th>Outcomes</th><th>Control</th><th>Intervention</th><th>Difference</th><th>NNT</th><th>Certainty</th></tr>' +
+    '<tr><td>Primary outcome</td>' +
+    '<td class="num">' + eventsPer1000 + ' per 1,000</td>' +
+    '<td class="num">' + expPer1000 + ' per 1,000</td>' +
+    '<td class="num">' + diffPer1000 + ' fewer per 1,000</td>' +
+    '<td class="num">' + (isFinite(nnt) ? nnt : '—') + '</td>' +
+    '<td><span class="grade-badge grade-' + gradeLabel.replace(' ', '_') + '">' + escapeHtml(gradeLabel) + '</span></td></tr>';
+
+  window._lastGrade = {
+    design, measure, est, lo, hi, k, totalN, i2, tau2, cer, eggerP,
+    gradeLabel, score, domains, upgrades, eer, arr, nnt
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXPORTS
+═══════════════════════════════════════════════════════════════ */
+function exportJSON() {
+  if (!window._lastGrade) { alert('Assess first.'); return; }
+  const r = window._lastGrade;
+  const bundle = {
+    '@type': 'AutoGRADE Assessment', version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    input: { design: r.design, measure: r.measure, estimate: r.est, ci: [r.lo, r.hi],
+             k: r.k, total_n: r.totalN, i2: r.i2, tau2: r.tau2, baseline_risk: r.cer, egger_p: r.eggerP },
+    assessment: {
+      certainty: r.gradeLabel, score: r.score,
+      domains: r.domains.map(d => ({ name: d.name, downgrade: d.down, detail: d.detail })),
+      upgrades: r.upgrades
+    },
+    absolute_effects: { cer_per_1000: Math.round(r.cer * 1000), eer_per_1000: r.eer !== null ? Math.round(r.eer * 1000) : null, nnt: isFinite(r.nnt) ? r.nnt : null },
+    provenance: { tool: 'AutoGRADE v1.0.0', reference: 'Guyatt et al. BMJ 2008; Balshem et al. JCE 2011' }
+  };
+  const json = JSON.stringify(bundle, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = 'autograde_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function copySoF() {
+  const table = document.getElementById('sofTable');
+  const range = document.createRange();
+  range.selectNode(table);
+  window.getSelection().removeAllRanges();
+  window.getSelection().addRange(range);
+  document.execCommand('copy');
+  window.getSelection().removeAllRanges();
+  const btn = event.target;
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = 'Copy SoF Table'; }, 1500);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EVENT WIRING
+═══════════════════════════════════════════════════════════════ */
+document.getElementById('exSel').addEventListener('change', function() {
+  const ex = EXAMPLES[this.value]; if (!ex) return;
+  document.getElementById('studyDesign').value = ex.studyDesign;
+  document.getElementById('effectMeasure').value = ex.effectMeasure;
+  document.getElementById('effectEst').value = ex.effectEst;
+  document.getElementById('ciLo').value = ex.ciLo;
+  document.getElementById('ciHi').value = ex.ciHi;
+  document.getElementById('kStudies').value = ex.kStudies;
+  document.getElementById('totalN').value = ex.totalN;
+  document.getElementById('i2').value = ex.i2;
+  document.getElementById('tau2').value = ex.tau2;
+  document.getElementById('baselineRisk').value = ex.baselineRisk;
+  document.getElementById('eggerP').value = ex.eggerP;
+  document.getElementById('robHigh').value = ex.robHigh;
+  document.getElementById('robUnclear').value = ex.robUnclear;
+  document.getElementById('indirectness').value = ex.indirectness;
+  document.getElementById('oisMet').value = ex.oisMet;
+  document.getElementById('doseResponse').value = ex.doseResponse;
+  document.getElementById('largeEffect').value = ex.largeEffect;
+  document.getElementById('plausibleConf').value = ex.plausibleConf;
+  computeGrade();
+});
+
+document.getElementById('themeBtn').addEventListener('click', function() {
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', d ? '' : 'dark');
+  this.textContent = d ? 'Dark Mode' : 'Light Mode';
+});
+
+(function() {
+  const m = document.getElementById('aboutModal'), ob = document.getElementById('aboutBtn'), cb = document.getElementById('aboutX');
+  let _kb = null;
+  function open() {
+    m.classList.remove('hidden'); cb.focus();
+    _kb = function(e) {
+      if (e.key === 'Escape') { close(); e.preventDefault(); }
+      if (e.key === 'Tab') {
+        const f = m.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+        if (e.shiftKey) { if (document.activeElement === f[0]) { f[f.length-1].focus(); e.preventDefault(); } }
+        else { if (document.activeElement === f[f.length-1]) { f[0].focus(); e.preventDefault(); } }
+      }
+    };
+    document.addEventListener('keydown', _kb);
+  }
+  function close() { m.classList.add('hidden'); if (_kb) { document.removeEventListener('keydown', _kb); _kb = null; } ob.focus(); }
+  ob.addEventListener('click', open); cb.addEventListener('click', close);
+  m.addEventListener('click', function(e) { if (e.target === m) close(); });
+})();
+
+// Auto-compute default example
+document.getElementById('exSel').dispatchEvent(new Event('change'));
+</script>
+</body>
+</html>
