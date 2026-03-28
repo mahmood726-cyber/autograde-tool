@@ -1,0 +1,96 @@
+{
+  "title": "AutoGRADE: Algorithmic Certainty of Evidence Assessment for Meta-Analytic Outputs",
+  "slug": "autograde-certainty-calculator",
+  "author": "Mahmood Ahmad",
+  "date": "2026-03-26",
+  "body": "Can algorithmic GRADE assessment produce certainty ratings concordant with expert consensus for meta-analytic evidence? AutoGRADE is a browser-based open-source calculator evaluating all five GRADE domains using quantitative meta-analysis inputs including point estimate, confidence interval, I-squared, tau-squared, study count, sample size, Egger test p-value, and risk-of-bias proportions. The tool applies threshold-based decision rules calibrated to GRADE guidance, generating domain ratings from no concern through very serious with an overall certainty grade and automated Summary of Findings table. Applied to three scenarios covering SGLT2 inhibitors, SSRIs, and vitamin D, AutoGRADE correctly assigned the published consensus GRADE rating for all three cases. Sensitivity testing confirmed that domain ratings changed monotonically with driving parameters and never produced paradoxical upgrades across plausible ranges. This tool enables rapid, reproducible certainty assessment that can accompany any pairwise meta-analysis output as a structured clinical decision aid. However, the limitation of rule-based domain scoring means nuanced clinical judgments requiring contextual interpretation still necessitate expert override.",
+  "word_count": 156,
+  "sentence_count": 7,
+  "sentences": [
+    {
+      "role": "Question",
+      "text": "Can algorithmic GRADE assessment produce certainty ratings concordant with expert consensus for meta-analytic evidence?"
+    },
+    {
+      "role": "Dataset",
+      "text": "AutoGRADE is a browser-based open-source calculator evaluating all five GRADE domains using quantitative meta-analysis inputs including point estimate, confidence interval, I-squared, tau-squared, study count, sample size, Egger test p-value, and risk-of-bias proportions."
+    },
+    {
+      "role": "Method",
+      "text": "The tool applies threshold-based decision rules calibrated to GRADE guidance, generating domain ratings from no concern through very serious with an overall certainty grade and automated Summary of Findings table."
+    },
+    {
+      "role": "Primary result",
+      "text": "Applied to three scenarios covering SGLT2 inhibitors, SSRIs, and vitamin D, AutoGRADE correctly assigned the published consensus GRADE rating for all three cases."
+    },
+    {
+      "role": "Robustness",
+      "text": "Sensitivity testing confirmed that domain ratings changed monotonically with driving parameters and never produced paradoxical upgrades across plausible ranges."
+    },
+    {
+      "role": "Interpretation",
+      "text": "This tool enables rapid, reproducible certainty assessment that can accompany any pairwise meta-analysis output as a structured clinical decision aid."
+    },
+    {
+      "role": "Boundary",
+      "text": "However, the limitation of rule-based domain scoring means nuanced clinical judgments requiring contextual interpretation still necessitate expert override."
+    }
+  ],
+  "notes": {
+    "app": "AutoGRADE v1.0",
+    "data": "Three clinical benchmarks (SGLT2i, SSRIs, vitamin D)",
+    "code": "https://github.com/mahmood726-cyber/autograde-tool",
+    "doi": "",
+    "version": "1.0",
+    "date": "2026-03-26",
+    "validation": "DRAFT"
+  },
+  "type": "methods",
+  "primary_estimand": "GRADE certainty rating (High/Moderate/Low/Very Low)",
+  "validation": {
+    "status": "fail",
+    "checks": [
+      {
+        "name": "single paragraph",
+        "ok": true,
+        "detail": "Body must not contain blank-line paragraph breaks."
+      },
+      {
+        "name": "sentence count",
+        "ok": true,
+        "detail": "Found 7 sentences."
+      },
+      {
+        "name": "word count",
+        "ok": true,
+        "detail": "Found 156 words."
+      },
+      {
+        "name": "no headings",
+        "ok": true,
+        "detail": "No markdown headings allowed in body."
+      },
+      {
+        "name": "no links",
+        "ok": true,
+        "detail": "No links or DOI links allowed in body."
+      },
+      {
+        "name": "result sentence has interval",
+        "ok": false,
+        "detail": "Sentence 4 should include a confidence interval."
+      },
+      {
+        "name": "result sentence has estimand",
+        "ok": false,
+        "detail": "Sentence 4 should name an effect measure or test metric."
+      },
+      {
+        "name": "boundary sentence present",
+        "ok": true,
+        "detail": "Sentence 7 should express a limitation, harm, or scope boundary."
+      }
+    ]
+  },
+  "schema": "e156-v0.2"
+}
