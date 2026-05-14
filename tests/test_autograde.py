@@ -64,6 +64,13 @@ class TestAutoGRADE(unittest.TestCase):
 
     def js(self, s): return self.d.execute_script(s)
 
+    def load_example(self, name):
+        self.js(f"""
+            document.getElementById('exSel').value = '{name}';
+            document.getElementById('exSel').dispatchEvent(new Event('change'));
+        """)
+        time.sleep(0.3)
+
     # 01: Title
     def test_01_title(self):
         self.assertIn('AutoGRADE', self.d.title)
@@ -75,28 +82,21 @@ class TestAutoGRADE(unittest.TestCase):
 
     # 03: SGLT2i should be HIGH certainty (RCTs, no downgrades)
     def test_03_sglt2i_high(self):
+        self.load_example('sglt2i')
         r = self.js("return window._lastGrade;")
         self.assertIsNotNone(r)
         self.assertEqual(r['gradeLabel'], 'HIGH', f'SGLT2i should be HIGH, got {r["gradeLabel"]}')
 
     # 04: SSRIs should be LOW (RoB + inconsistency + pub bias)
     def test_04_ssri_low(self):
-        self.js("""
-            document.getElementById('exSel').value = 'ssri';
-            document.getElementById('exSel').dispatchEvent(new Event('change'));
-        """)
-        time.sleep(0.3)
+        self.load_example('ssri')
         r = self.js("return window._lastGrade;")
         self.assertIn(r['gradeLabel'], ['LOW', 'VERY LOW'],
             f'SSRIs should be LOW or VERY LOW, got {r["gradeLabel"]}')
 
     # 05: Vitamin D should have imprecision downgrade (CI crosses null)
     def test_05_vitd_imprecision(self):
-        self.js("""
-            document.getElementById('exSel').value = 'vitd';
-            document.getElementById('exSel').dispatchEvent(new Event('change'));
-        """)
-        time.sleep(0.3)
+        self.load_example('vitd')
         r = self.js("return window._lastGrade;")
         imprecision = [d for d in r['domains'] if d['name'] == 'Imprecision'][0]
         self.assertGreater(imprecision['down'], 0, 'Vitamin D should have imprecision downgrade (CI crosses null)')
@@ -112,19 +112,14 @@ class TestAutoGRADE(unittest.TestCase):
     # 07: RCT starts at HIGH (4), OBS at LOW (2)
     def test_07_starting_certainty(self):
         # RCT — reload SGLT2i
-        self.js("""
-            document.getElementById('exSel').value = 'sglt2i';
-            document.getElementById('exSel').dispatchEvent(new Event('change'));
-        """)
-        time.sleep(0.3)
+        self.load_example('sglt2i')
         summary = self.d.find_element(By.ID, 'gradeSummary').text
         self.assertIn('Starting: HIGH', summary)
 
     # 08: High RoB → serious downgrade
     def test_08_rob_downgrade(self):
+        self.load_example('sglt2i')
         self.js("""
-            document.getElementById('exSel').value = 'sglt2i';
-            document.getElementById('exSel').dispatchEvent(new Event('change'));
             document.getElementById('robHigh').value = '40';
             computeGrade();
         """)
@@ -135,9 +130,8 @@ class TestAutoGRADE(unittest.TestCase):
 
     # 09: Very high I² → very serious inconsistency
     def test_09_high_i2(self):
+        self.load_example('sglt2i')
         self.js("""
-            document.getElementById('exSel').value = 'sglt2i';
-            document.getElementById('exSel').dispatchEvent(new Event('change'));
             document.getElementById('i2').value = '80';
             computeGrade();
         """)
@@ -163,9 +157,8 @@ class TestAutoGRADE(unittest.TestCase):
 
     # 11: Egger p < 0.10 → serious pub bias; p < 0.01 → very serious
     def test_11_pub_bias(self):
+        self.load_example('sglt2i')
         self.js("""
-            document.getElementById('exSel').value = 'sglt2i';
-            document.getElementById('exSel').dispatchEvent(new Event('change'));
             document.getElementById('eggerP').value = '0.03';
             computeGrade();
         """)
@@ -222,16 +215,13 @@ class TestAutoGRADE(unittest.TestCase):
 
     # 14: SoF table rendered
     def test_14_sof_table(self):
-        self.js("""
-            document.getElementById('exSel').value = 'sglt2i';
-            document.getElementById('exSel').dispatchEvent(new Event('change'));
-        """)
-        time.sleep(0.3)
+        self.load_example('sglt2i')
         rows = self.d.find_elements(By.CSS_SELECTOR, '#sofBody tr')
         self.assertGreater(len(rows), 0, 'SoF table should have rows')
 
     # 15: NNT computed for ratio measures
     def test_15_nnt(self):
+        self.load_example('sglt2i')
         r = self.js("return window._lastGrade;")
         self.assertIsNotNone(r['nnt'], 'NNT should be computed for ratio measures')
         self.assertGreater(r['nnt'], 0)
