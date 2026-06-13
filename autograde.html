@@ -190,7 +190,7 @@
     <button class="modal-x" id="aboutX" aria-label="Close">&times;</button>
     <h2 id="aboutT">AutoGRADE v1.0.0</h2>
     <p><strong>Open-Source Certainty of Evidence Calculator</strong></p>
-    <p>Computes GRADE certainty ratings from quantitative meta-analysis parameters. The first open-source, browser-based tool that automates all 5 downgrade domains and 3 upgrade domains.</p>
+    <p>Computes GRADE certainty ratings from quantitative meta-analysis parameters. An open-source, browser-based tool that automates the 5 downgrade domains and 3 upgrade domains.</p>
 
     <h3>GRADE Domains</h3>
     <h4 style="font-size:.85rem;margin-top:8px">Downgrade (each -1 or -2):</h4>
@@ -278,8 +278,8 @@ function computeGrade() {
   const design = document.getElementById('studyDesign').value;
   const measure = document.getElementById('effectMeasure').value;
   const est = pNum('effectEst', NaN);
-  const lo = pNum('ciLo', NaN);
-  const hi = pNum('ciHi', NaN);
+  let lo = pNum('ciLo', NaN);
+  let hi = pNum('ciHi', NaN);
   const k = pInt('kStudies', 2);
   const totalN = pInt('totalN', 1000);
   const i2 = pNum('i2', 0);
@@ -517,6 +517,8 @@ document.getElementById('exSel').addEventListener('change', function() {
   document.getElementById('plausibleConf').value = ex.plausibleConf;
   computeGrade();
 });
+
+document.getElementById('copySofBtn').addEventListener('click', copySoF);
 
 document.getElementById('themeBtn').addEventListener('click', function() {
   const d = document.documentElement.getAttribute('data-theme') === 'dark';
